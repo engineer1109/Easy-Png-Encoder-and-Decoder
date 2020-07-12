@@ -1,0 +1,55 @@
+BasedOnStyle: LLVM
+
+AccessModifierOffset: -4
+
+PointerAlignment: Right
+
+IndentWidth: 4
+
+MaxEmptyLinesToKeep: 1
+
+AllowShortFunctionsOnASingleLine: true
+
+AllowShortIfStatementsOnASingleLine: true
+
+AlignAfterOpenBracket: true
+
+IndentCaseLabels: true
+
+ObjCBlockIndentWidth: 4
+
+ObjCSpaceAfterProperty: true
+
+AlignTrailingComments: true
+
+SpaceAfterCStyleCast: false
+
+AlignOperands: true
+
+SpacesInSquareBrackets: false
+
+AlignConsecutiveDeclarations: false
+
+SpacesInContainerLiterals: false
+
+BreakConstructorInitializersBeforeComma: true
+
+AllowAllParametersOfDeclarationOnNextLine: true
+
+ColumnLimit: 120
+
+ContinuationIndentWidth: 4
+
+TabWidth: 4
+
+SpaceBeforeAssignmentOperators: true
+
+SpacesBeforeTrailingComments: 1
+
+AlwaysBreakTemplateDeclarations: true
+
+BreakBeforeBraces: Custom
+BraceWrapping:  
+  AfterControlStatement: false
+  BeforeCatch: true
+  BeforeElse: true
