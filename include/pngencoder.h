@@ -1,34 +1,42 @@
 #ifndef LIPNGCODEC_PNGENCODER_H
 #define LIPNGCODEC_PNGENCODER_H
 #include "pngcodec_def.h"
-#include <opencv2/opencv.hpp>
+//#include <opencv2/opencv.hpp>
 
-class PNGCODEC_EXPORT PngEncoder
-{
+class PNGCODEC_EXPORT PngEncoder {
+public:
+    enum class ZLIBCompressType {
+        ZLIB_NO_COMPRESSION = 0,
+        ZLIB_BEST_SPEED = 1,
+        ZLIB_BEST_COMPRESSION = 9,
+        ZLIB_DEFAULT_COMPRESSION = -1,
+    };
+
 public:
     PngEncoder();
     ~PngEncoder() {}
-    //bool isFormatSupported(int depth) const;
 
-    bool setDestination(const std::string& filename);
-    bool setDestination(std::vector<uchar>& buf);
-    bool write(const cv::Mat& img, const std::vector<int>& params);
-    //virtual bool writemulti(const std::vector<Mat>& img_vec, const std::vector<int>& params);
+    void setInputRawBuffer(std::vector<uint8_t> &rawBuffer, int width, int height, int channels, int bit_depth);
 
-    //virtual String getDescription() const;
-    //PngImageEncoder newEncoder() const;
-
-    //virtual void throwOnEror() const;
+    void setOutputEncodeStream(const std::string &filename);
+    void setOutputEncodeStream(std::vector<uint8_t> &buf);
+    void setZLIBCompressType(ZLIBCompressType type);
+    bool run();
 
 protected:
-    //String m_description;
-    static void writeDataToBuf(void* png_ptr, uchar* src, size_t size);
-    static void flushBuf(void* png_ptr);
+    // String m_description;
+    static void writeDataToBuf(void *png_ptr, uint8_t *src, size_t size);
+    static void flushBuf(void *png_ptr);
     std::string m_filename;
-    std::vector<uchar>* m_buf;
-    //bool m_buf_supported;
+    std::vector<uint8_t> *m_buf;
+    int m_width;
+    int m_height;
+    int m_bit_depth = 8;
+    int m_color_type = 0;
+    int m_color = 3;
+    ZLIBCompressType m_zlibCompressType = ZLIBCompressType::ZLIB_BEST_COMPRESSION;
 
-    //String m_last_error;
+    std::vector<uint8_t> m_inputStream;
 };
 
 #endif

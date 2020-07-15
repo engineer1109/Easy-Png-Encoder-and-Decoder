@@ -2,11 +2,6 @@
 #include "pngutils.h"
 #include <png.h>
 
-#define Z_NO_COMPRESSION 0
-#define Z_BEST_SPEED 1
-#define Z_BEST_COMPRESSION 9
-#define Z_DEFAULT_COMPRESSION (-1)
-
 #define Z_FILTERED 1
 #define Z_HUFFMAN_ONLY 2
 #define Z_RLE 3
@@ -15,24 +10,33 @@
 
 PngEncoder::PngEncoder() { m_buf = 0; }
 
-bool PngEncoder::setDestination(const std::string &filename) {
-    m_filename = filename;
-    m_buf = 0;
-    return true;
+void PngEncoder::setInputRawBuffer(std::vector<uint8_t> &rawBuffer, int width, int height, int channels,
+                                   int bit_depth) {
+    m_inputStream = rawBuffer;
+    m_width = width;
+    m_height = height;
+    m_color = channels;
+    m_bit_depth = bit_depth;
 }
 
-bool PngEncoder::setDestination(std::vector<uchar> &buf) {
+void PngEncoder::setOutputEncodeStream(const std::string &filename) {
+    m_filename = filename;
+    m_buf = 0;
+}
+
+void PngEncoder::setOutputEncodeStream(std::vector<uint8_t> &buf) {
     m_buf = &buf;
     m_buf->clear();
     m_filename = std::string();
-    return true;
 }
 
-void PngEncoder::writeDataToBuf(void *_png_ptr, uchar *src, size_t size) {
+void PngEncoder::setZLIBCompressType(ZLIBCompressType type) { m_zlibCompressType = type; }
+
+void PngEncoder::writeDataToBuf(void *_png_ptr, uint8_t *src, size_t size) {
     if (size == 0) return;
     png_structp png_ptr = reinterpret_cast<png_structp>(_png_ptr);
     PngEncoder *encoder = (PngEncoder *)(png_get_io_ptr(png_ptr));
-    CV_Assert(encoder && encoder->m_buf);
+
     size_t cursz = encoder->m_buf->size();
     encoder->m_buf->resize(cursz + size);
     memcpy(&(*encoder->m_buf)[cursz], src, size);
@@ -40,16 +44,17 @@ void PngEncoder::writeDataToBuf(void *_png_ptr, uchar *src, size_t size) {
 
 void PngEncoder::flushBuf(void *) {}
 
-bool PngEncoder::write(const cv::Mat &img, const std::vector<int> &params) {
+bool PngEncoder::run() {
     png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     png_infop info_ptr = 0;
     FILE *volatile f = 0;
-    int y, width = img.cols, height = img.rows;
-    int depth = img.depth(), channels = img.channels();
+    int y;
+    int width = m_width;
+    int height = m_height;
+    int depth = m_bit_depth;
+    int channels = m_color;
     volatile bool result = false;
-    cv::AutoBuffer<uchar *> buffer;
-
-    if (depth != CV_8U && depth != CV_16U) return false;
+    uint8_t **buffer;
 
     if (png_ptr) {
         info_ptr = png_create_info_struct(png_ptr);
@@ -69,15 +74,19 @@ bool PngEncoder::write(const cv::Mat &img, const std::vector<int> &params) {
                 int compression_strategy = IMWRITE_PNG_STRATEGY_RLE; // Default strategy
                 bool isBilevel = false;
 
+                std::vector<int> params;
+                params.push_back(int(m_zlibCompressType));
+
                 for (size_t i = 0; i < params.size(); i += 2) {
                     if (params[i] == IMWRITE_PNG_COMPRESSION) {
                         compression_strategy = IMWRITE_PNG_STRATEGY_DEFAULT; // Default strategy
                         compression_level = params[i + 1];
-                        compression_level = MIN(MAX(compression_level, 0), Z_BEST_COMPRESSION);
+                        compression_level =
+                            std::min(std::max(compression_level, 0), int(ZLIBCompressType::ZLIB_BEST_COMPRESSION));
                     }
                     if (params[i] == IMWRITE_PNG_STRATEGY) {
                         compression_strategy = params[i + 1];
-                        compression_strategy = MIN(MAX(compression_strategy, 0), Z_FIXED);
+                        compression_strategy = std::min(std::max(compression_strategy, 0), Z_FIXED);
                     }
                     if (params[i] == IMWRITE_PNG_BILEVEL) {
                         isBilevel = params[i + 1] != 0;
@@ -90,11 +99,11 @@ bool PngEncoder::write(const cv::Mat &img, const std::vector<int> &params) {
                     }
                     else {
                         png_set_filter(png_ptr, PNG_FILTER_TYPE_BASE, PNG_FILTER_SUB);
-                        png_set_compression_level(png_ptr, Z_BEST_SPEED);
+                        png_set_compression_level(png_ptr, int(ZLIBCompressType::ZLIB_BEST_SPEED));
                     }
                     png_set_compression_strategy(png_ptr, compression_strategy);
 
-                    png_set_IHDR(png_ptr, info_ptr, width, height, depth == CV_8U ? isBilevel ? 1 : 8 : 16,
+                    png_set_IHDR(png_ptr, info_ptr, width, height, depth == 8 ? isBilevel ? 1 : 8 : 16,
                                  channels == 1 ? PNG_COLOR_TYPE_GRAY
                                                : channels == 3 ? PNG_COLOR_TYPE_RGB : PNG_COLOR_TYPE_RGBA,
                                  PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
@@ -108,13 +117,12 @@ bool PngEncoder::write(const cv::Mat &img, const std::vector<int> &params) {
                         png_set_swap(png_ptr);
                     }
 
-                    buffer.allocate(height);
+                    buffer = (uint8_t **)malloc(height * sizeof(uint8_t *));
                     for (y = 0; y < height; y++)
-                        buffer[y] = img.data + y * img.step;
+                        buffer[y] = m_inputStream.data() + y * m_height * m_bit_depth / 8 * m_color;
 
-                    unsigned char **ptr = buffer.operator uchar **();
                     // png_write_image(png_ptr, buffer.data());
-                    png_write_image(png_ptr, ptr);
+                    png_write_image(png_ptr, buffer);
                     png_write_end(png_ptr, info_ptr);
 
                     result = true;

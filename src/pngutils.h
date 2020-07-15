@@ -4,8 +4,10 @@
 
 #ifndef PNGCODEC_PNGUTILS_H
 #define PNGCODEC_PNGUTILS_H
+#include <algorithm>
 #include <array>
 #include <memory>
+#include <string.h>
 #include <vector>
 
 class PngUtils {

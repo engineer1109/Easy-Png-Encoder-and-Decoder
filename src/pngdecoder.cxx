@@ -7,7 +7,6 @@ PngDecoder::PngDecoder() {
     m_info_ptr = m_end_info = 0;
     m_f = 0;
     // m_buf_supported = true;
-    m_buf_pos = 0;
     m_bit_depth = 0;
 }
 
@@ -15,8 +14,13 @@ PngDecoder::~PngDecoder() { close(); }
 
 bool PngDecoder::inputFile(const std::string &filename) {
     m_filename = filename;
-    m_buf.release();
     return true;
+}
+
+void PngDecoder::inputPngBuffer(uint8_t *pngBuffer, size_t size) {
+    m_pngBuffer.data = new uint8_t[size];
+    memcpy(m_pngBuffer.data, pngBuffer, size);
+    m_pngBuffer.size = size;
 }
 
 static void readDataFromBuf(png_structp png_ptr, png_bytep data, png_size_t length) {
@@ -51,18 +55,17 @@ bool PngDecoder::run() {
         m_png_ptr = png_ptr;
         m_info_ptr = info_ptr;
         m_end_info = end_info;
-        m_buf_pos = 0;
 
         if (info_ptr && end_info) {
             if (setjmp(png_jmpbuf(png_ptr)) == 0) {
-                if (!m_buf.empty() or m_pngBuffer.data != nullptr)
+                if (m_pngBuffer.data != nullptr)
                     png_set_read_fn(png_ptr, &m_pngBuffer, (png_rw_ptr)readDataFromBuf);
                 else {
                     m_f = fopen(m_filename.c_str(), "rb");
                     if (m_f) png_init_io(png_ptr, m_f);
                 }
 
-                if (!m_buf.empty() || m_f or m_pngBuffer.data != nullptr) {
+                if (m_f or m_pngBuffer.data != nullptr) {
                     png_uint_32 wdth, hght;
                     int bit_depth, color_type, num_trans = 0;
                     png_bytep trans;
@@ -76,27 +79,7 @@ bool PngDecoder::run() {
                     m_height = (int)hght;
                     m_color_type = color_type;
                     m_bit_depth = bit_depth;
-
-                    if (bit_depth <= 8 || bit_depth == 16) {
-                        switch (color_type) {
-                            case PNG_COLOR_TYPE_RGB:
-                            case PNG_COLOR_TYPE_PALETTE:
-                                png_get_tRNS(png_ptr, info_ptr, &trans, &num_trans, &trans_values);
-                                if (num_trans > 0)
-                                    m_type = CV_8UC4;
-                                else
-                                    m_type = CV_8UC3;
-                                break;
-                            case PNG_COLOR_TYPE_GRAY_ALPHA:
-                            case PNG_COLOR_TYPE_RGB_ALPHA:
-                                m_type = CV_8UC4;
-                                break;
-                            default:
-                                m_type = CV_8UC1;
-                        }
-                        if (bit_depth == 16) m_type = CV_MAKETYPE(CV_16U, CV_MAT_CN(m_type));
-                        result = true;
-                    }
+                    result = true;
                 }
             }
         }
